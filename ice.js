@@ -25,14 +25,6 @@ export class ICEScope {
 			}
 		}
 	}
-
-	/**
-	 * 
-	 * @param {string} AppName 
-	 */
-	static Init(AppName) {
-
-	}
 }
 
 export class Controller {
