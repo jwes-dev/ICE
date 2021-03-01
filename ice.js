@@ -3,7 +3,7 @@
  * Interface Component Element
  */
 
-export class ICEScope {
+export class ControllerScope {
 	/**
 	 * Scope class. Creates a node with only ice
 	 * @param {HTMLElement} ScopeElement 
@@ -36,6 +36,6 @@ export class Controller {
 		if (this.App === null) {
 			throw "App " + AppName + " not found";
 		}
-		this.Scope = new ICEScope(this.App);
+		this.Scope = new ControllerScope(this.App);
 	}
 }
