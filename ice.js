@@ -108,4 +108,14 @@ const DynamicComponentLoader = function () {
     }
 };
 
+export var appEvents = new EventTarget();
+
+export function StartICEApp()
+{
+    dynamicComponentLoader.startLoading().then(() => {
+        appEvents.dispatchEvent(new Event('component_load_complete'));
+    }).catch(e => {
+        throw e;
+    })}
+
 export var dynamicComponentLoader = new DynamicComponentLoader();
