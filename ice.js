@@ -14,7 +14,7 @@ export class ICEScope {
             let name = '';
             for (let ice of elements) {
                 name = ice.getAttribute("ice-name");
-                name = name.replace(/-(.)/g, function(match, group1) {
+                name = name.replace(/-(.)/g, function (match, group1) {
                     return group1.toUpperCase();
                 })
                 name = name.charAt(0).toLowerCase() + name.slice(1);
@@ -63,30 +63,49 @@ export class Controller {
     }
 }
 
-const BootstrapComponent = function () {
-    this.componentList = new Map();
-    this.components = [];
-    this.register = (componentClass) => {
-        this.componentList.set(componentClass.name, componentClass)
+const DynamicComponentLoader = function () {
+    this.componentRegistry = new Map();
+    this.instances = [];
+    this.register = function (componentName, filePath) {
+        this.componentRegistry.set(componentName, filePath);
     }
-    this.doBootstrap = () => {
-        document.querySelectorAll("[ice-app]").forEach(el => {
-            let className = el.getAttribute("ice-app");
-            this.components.push(this.getInstance(className));
-        });
-    }
-    this.getInstance = (name) => {
-        if (this.componentList.has(name)) {
-            var instance = new (this.componentList.get(name))();
-            if (instance instanceof Controller) {
-                return instance;
-            } else {
-                throw "Invalid controller class";
-            }
-        } else {
-            throw "Controller [" + name + "] not found";
-        }
-    }
-}
 
-export var bootstrapComponent = new BootstrapComponent();
+    this.startLoading = function () {
+        let counter = 0;
+        let loaded = 0;
+        return new Promise((resolve, reject) => {
+            try {
+                document.querySelectorAll("[ice-app]").forEach(el => {
+                    counter++;
+                    let componentName = el.getAttribute("ice-app");
+                    let path = this.componentRegistry.get(componentName)
+                    if (undefined === path) {
+                        console.log("Unregistered component found " + componentName);
+                        return;
+                    }
+                    import(path).then(component => {
+                        if (undefined === component) {
+                            console.log("Make sure the path is correct and that the script file is accessible for component " + componentName);
+                        }
+                        if (!Object.hasOwn(component, componentName)) {
+                            console.log("Controller [" + name + "] not found");
+                        }
+                        let instance = new component[componentName]();
+                        if (instance instanceof Controller) {
+                            return instance;
+                        } else {
+                            console.log("Invalid controller class");
+                        }
+                        this.instances.push(instance);
+                        loaded++;
+                    });
+                });
+                resolve('success');
+            } catch (e) {
+                reject(e);
+            }
+        })
+    }
+};
+
+export var dynamicComponentLoader = new DynamicComponentLoader();
