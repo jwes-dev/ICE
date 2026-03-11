@@ -12,7 +12,6 @@ export class ICEScope {
      */
     constructor(ScopeElement) {
         this.__Scope_element__ = ScopeElement;
-        this.LoadScope();
     }
 
     UpdateScope() {
@@ -107,7 +106,6 @@ export class ContextStore {
 
 export class Controller {
     constructor(appContainer = null, isPageApp = false) {
-        this.Scope = null;
         /**
          * This element contains the app node
          * Dispatches "scope-initialised" event once the app scope is initialised
@@ -116,22 +114,28 @@ export class Controller {
         this.isPageApp = isPageApp;
 
         this.componentObjects = new ContextStore();
+
+        try {
+            if (this.App === null) {
+                if (this.isPageApp) {
+                    this.App = document.querySelector("[ice-page-app]");
+                } else {
+                    this.App = document.querySelector("[ice-app='" + this.constructor.name + "']");
+                }
+            }
+            if (this.App === null) {
+                console.error("App " + AppName + " not found");
+            }
+            this.Scope = new ICEScope(this.App);
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     Init() {
         return new Promise((resolve, reject) => {
             try {
-                if (this.App === null) {
-                    if (this.isPageApp) {
-                        this.App = document.querySelector("[ice-page-app]");
-                    } else {
-                        this.App = document.querySelector("[ice-app='" + this.constructor.name + "']");
-                    }
-                }
-                if (this.App === null) {
-                    reject("App " + AppName + " not found");
-                }
-                this.Scope = new ICEScope(this.App);
+                this.Scope.LoadScope();
                 resolve();
             } catch (e) {
                 reject(e);
@@ -270,18 +274,16 @@ export const __render = {
         const render = data => {
             const templateString = componentFunction(data, ...args)
             updateDOMFromTemplate(templateString, container, 20)
-            // container.innerHTML = componentFunction(data, ...args);
+            setTimeout(() => {
+                if (container.querySelector("[ice-name]")) {
+                    scopeVar?.UpdateScope();
+                }
+            })
         }
 
         render(dataSet);
 
         const unsubscribe = dataSet.on(() => render(dataSet));
-
-        setTimeout(() => {
-            if (container.querySelector("[ice-name]")) {
-                scopeVar?.UpdateScope();
-            }
-        })
         return unsubscribe;
     }
 };
@@ -372,6 +374,10 @@ export class StateVar {
         return this._data[prop] !== null && this._data[prop] !== undefined;
     }
 
+    isInitialised() {
+        return this._data !== null;
+    }
+
     values() {
         if (typeof this._data === 'object' || typeof this._data === 'function') {
             return Array.isArray(this._data) ? [...this._data] : {...this._data};
@@ -381,6 +387,9 @@ export class StateVar {
     }
 
     hasAnyValue() {
+        if (Array.isArray(this._data)) {
+            return this._data.length > 0;
+        }
         for (const key in this._data) {
             if (this._data[key] !== null && this._data[key] !== undefined) {
                 return true;
@@ -524,14 +533,13 @@ function diffNode(realNode, newNode, depth, maxDepth) {
         throw new Error("dangerous path change");
     }
 
-    // Replace if structurally different
     if (realNode.nodeType !== newNode.nodeType ||
         realNode.nodeName !== newNode.nodeName) {
         realNode.replaceWith(newNode.cloneNode(true));
         return;
     }
 
-    // Text node
+    // Text
     if (realNode.nodeType === Node.TEXT_NODE) {
         if (realNode.textContent !== newNode.textContent) {
             realNode.textContent = newNode.textContent;
@@ -539,10 +547,10 @@ function diffNode(realNode, newNode, depth, maxDepth) {
         return;
     }
 
-    // Element node: sync attributes
+    // Element
     syncAttributes(realNode, newNode);
+    syncFormState(realNode, newNode);   // <-- ADD THIS
 
-    // Recurse children
     diffChildren(realNode, newNode, depth + 1, maxDepth);
 }
 
@@ -562,6 +570,34 @@ function syncAttributes(realEl, newEl) {
     for (let attr of newAttrs) {
         if (realEl.getAttribute(attr.name) !== attr.value) {
             realEl.setAttribute(attr.name, attr.value);
+        }
+    }
+}
+
+
+function syncFormState(realEl, newEl) {
+
+    const tag = realEl.tagName;
+
+    if (tag === "INPUT") {
+        const type = realEl.type;
+
+        if (type === "checkbox" || type === "radio") {
+            if (realEl.checked !== newEl.checked) {
+                realEl.checked = newEl.checked;
+            }
+        } else {
+            if (realEl.value !== newEl.value) {
+                realEl.value = newEl.value;
+            }
+        }
+    } else if (tag === "TEXTAREA") {
+        if (realEl.value !== newEl.value) {
+            realEl.value = newEl.value;
+        }
+    } else if (tag === "SELECT") {
+        if (realEl.value !== newEl.value) {
+            realEl.value = newEl.value;
         }
     }
 }
